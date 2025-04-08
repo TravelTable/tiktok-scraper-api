@@ -136,16 +136,21 @@ async def scrape_tiktok(
     url: str = Query(..., description="Full TikTok Video URL")
 ):
     headers = {
-        "User-Agent": random_user_agent(),
-        "Accept-Language": "en-US,en;q=0.9",
-    }
+    "User-Agent": random_user_agent(),
+    "Accept-Language": "en-US,en;q=0.9",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8",
+    "Referer": "https://www.google.com/",
+    "Connection": "keep-alive",
+    "Upgrade-Insecure-Requests": "1",
+}
+
 
     proxy = random_proxy()
     transport = httpx.AsyncHTTPTransport(proxy=proxy)
 
     try:
         async with httpx.AsyncClient(timeout=10, transport=transport) as client:
-            response = await client.get(url, headers=headers)
+            response = await client.get(url, headers=headers, follow_redirects=True)
             response.raise_for_status()
             html = response.text
 
