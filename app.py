@@ -6,7 +6,7 @@ from bs4 import BeautifulSoup
 import random
 import json
 
-app = FastAPI(title="TikTok Scraper API", version="1.3.0")
+app = FastAPI(title="TikTok Scraper API", version="1.4.0")
 
 # User-Agent list
 USER_AGENTS = [
@@ -44,9 +44,10 @@ async def scrape_tiktok(
     }
 
     proxy = random_proxy()
+    transport = httpx.AsyncHTTPTransport(proxy=proxy)
 
     try:
-        async with httpx.AsyncClient(timeout=10, proxies=proxy) as client:
+        async with httpx.AsyncClient(timeout=10, transport=transport) as client:
             response = await client.get(url, headers=headers)
             response.raise_for_status()
             html = response.text
@@ -100,4 +101,3 @@ async def scrape_tiktok(
         raise HTTPException(status_code=500, detail=f"Network error: {str(e)}")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error scraping TikTok: {str(e)}")
-
