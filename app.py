@@ -4,8 +4,10 @@ from fastapi.responses import JSONResponse
 import httpx
 from bs4 import BeautifulSoup
 import random
+import os
+import json
 
-app = FastAPI(title="TikTok Scraper API", version="1.1.0")
+app = FastAPI(title="TikTok Scraper API", version="1.2.0")
 
 # User-Agent list
 USER_AGENTS = [
@@ -23,13 +25,18 @@ FREE_PROXIES = [
     "http://159.89.163.128:8080"
 ]
 
-API_KEY = "your-secret-api-key"  # 🔒 Protect your API (step 2)
+# Get API_KEY from environment variable or fallback
+API_KEY = os.getenv("API_KEY", "your-secret-api-key")  # Secure 🔒
 
 def random_user_agent():
     return random.choice(USER_AGENTS)
 
 def random_proxy():
     return random.choice(FREE_PROXIES)
+
+@app.get("/")
+async def root():
+    return {"message": "✅ TikTok Scraper API is running"}
 
 @app.get("/scrape")
 async def scrape_tiktok(
@@ -62,8 +69,6 @@ async def scrape_tiktok(
                 raise HTTPException(status_code=500, detail="Unable to find TikTok data script.")
 
             json_data = sigi_script.string
-
-            import json
             data = json.loads(json_data)
 
             video_id = list(data["ItemModule"].keys())[0]
@@ -76,6 +81,7 @@ async def scrape_tiktok(
                 "createTime": video.get("createTime"),
                 "duration": video["video"].get("duration"),
                 "videoUrlWithWatermark": video["video"].get("playAddr"),
+                "videoUrlNoWatermark": video["video"].get("downloadAddr"),
                 "coverImageUrl": video["video"].get("cover"),
                 "likeCount": video["stats"].get("diggCount"),
                 "commentCount": video["stats"].get("commentCount"),
@@ -106,7 +112,3 @@ async def scrape_tiktok(
         raise HTTPException(status_code=500, detail=f"Network error: {str(e)}")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error scraping TikTok: {str(e)}")
-
-@app.get("/")
-async def root():
-    return {"message": "✅ TikTok Scraper API is running"}
