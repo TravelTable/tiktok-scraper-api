@@ -15,7 +15,7 @@ TIKTOK_HEADERS = {
 }
 
 # Paid Webshare proxies
-    PAID_PROXIES = [
+PAID_PROXIES = [
     "http://ihqqebfi:m65ebvc3vi3w@64.137.108.3:5596",
     "http://ihqqebfi:m65ebvc3vi3w@64.137.101.31:5345",
     "http://ihqqebfi:m65ebvc3vi3w@146.103.55.91:6143",
