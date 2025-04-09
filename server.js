@@ -3,6 +3,7 @@ const cors = require('cors');
 const axios = require('axios');
 const cheerio = require('cheerio');
 const { getXbogus } = require('./xbogus');
+const { HttpsProxyAgent } = require('https-proxy-agent'); // IMPORTANT: Added this
 const app = express();
 
 // Middleware
@@ -16,14 +17,14 @@ const proxies = [
     { host: "156.237.26.78", port: 5976, username: "ihqqebfi", password: "m65ebvc3vi3w" },
     { host: "62.164.228.15", port: 8327, username: "ihqqebfi", password: "m65ebvc3vi3w" },
     { host: "72.1.179.38", port: 6432, username: "ihqqebfi", password: "m65ebvc3vi3w" }
-  ]; 
+];
 
 // Load random user-agents
 const userAgents = [
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
   'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15',
   'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-  'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15A372 Safari/604.1',
+  'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15A372 Safari/604.1'
 ];
 
 // Random proxy picker
@@ -46,7 +47,7 @@ app.post('/generate-xbogus', (req, res) => {
   res.json({ xbogus });
 });
 
-// 🎯 Real Scrape Endpoint with Proxy Retry
+// 🎯 Real Scrape Endpoint
 app.post('/scrape', async (req, res) => {
   const { url } = req.body;
   if (!url) {
@@ -64,6 +65,9 @@ app.post('/scrape', async (req, res) => {
     attempt++;
 
     try {
+      const proxyUrl = `http://${proxy.username}:${proxy.password}@${proxy.host}:${proxy.port}`;
+      const agent = new HttpsProxyAgent(proxyUrl); // <-- 🔥 HERE IS THE FIX
+
       const xbogus = getXbogus(url, userAgent);
       const fullUrl = `${url.includes('?') ? url + '&' : url + '?'}X-Bogus=${xbogus}`;
 
@@ -73,14 +77,7 @@ app.post('/scrape', async (req, res) => {
           'Referer': 'https://www.tiktok.com/',
           'Accept-Language': 'en-US,en;q=0.9',
         },
-        proxy: {
-          host: proxy.host,
-          port: proxy.port,
-          auth: {
-            username: proxy.username,
-            password: proxy.password,
-          },
-        },
+        httpsAgent: agent, // <-- 🔥 USE httpsAgent instead of proxy
         timeout: 10000,
       });
 
@@ -109,7 +106,7 @@ app.post('/scrape', async (req, res) => {
         upload_date: videoData.createTime ? new Date(videoData.createTime * 1000).toISOString() : null,
       });
 
-      success = true; // ✅ Request succeeded
+      success = true;
     } catch (error) {
       console.error(`Attempt ${attempt} failed: ${error.message}`);
       finalError = error;
