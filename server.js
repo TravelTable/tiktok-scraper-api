@@ -18,7 +18,8 @@ app.post('/generate-xbogus', (req, res) => {
     res.json({ xbogus });
 });
 
-// 🚀 REAL SCRAPER ENDPOINT
+const cheerio = require('cheerio'); // ADD this at the top with other requires
+
 app.post('/scrape', async (req, res) => {
     const { url } = req.body;
     if (!url) {
@@ -26,45 +27,37 @@ app.post('/scrape', async (req, res) => {
     }
 
     try {
-        // Fake user-agent to act like a real browser
-        const userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36';
-
-        // Use your xbogus function to generate signature
-        const xbogus = getXbogus(url, userAgent);
-
-        // Append xbogus to the URL
-        const fullUrl = `${url}&X-Bogus=${xbogus}`;
-
-        const response = await axios.get(fullUrl, {
+        const response = await axios.get(url, {
             headers: {
-                'User-Agent': userAgent,
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36',
                 'Referer': 'https://www.tiktok.com/',
-                'Accept-Language': 'en-US,en;q=0.9'
             }
         });
 
-        const html = response.data;
+        const $ = cheerio.load(response.data);
+        const scriptTag = $('script[id="SIGI_STATE"]').html();
+        const data = JSON.parse(scriptTag);
 
-        // Example: Extract simple info using regex (we can upgrade this later)
-        const captionMatch = html.match(/<title data-e2e="video-title">(.*?)<\/title>/);
-        const authorMatch = html.match(/<h3 class=".*?@([a-zA-Z0-9_.]+).*?<\/h3>/);
+        const item = data?.ItemModule ? Object.values(data.ItemModule)[0] : null;
 
-        const data = {
-            caption: captionMatch ? captionMatch[1] : null,
-            author: authorMatch ? authorMatch[1] : null,
-            video_url: url,
-            thumbnail: null, // optional - can add later
-            likes: null,     // optional - can add later
-            shares: null,    // optional - can add later
-            comments: null,  // optional - can add later
-            music: null,     // optional - can add later
-            upload_date: null // optional - can add later
-        };
+        if (!item) {
+            return res.status(404).json({ error: 'Video not found or data structure changed.' });
+        }
 
-        res.json(data);
+        res.json({
+            caption: item.desc || null,
+            author: item.author || null,
+            video_url: item.video?.playAddr || null,
+            thumbnail: item.video?.cover || null,
+            likes: item.stats?.diggCount || null,
+            shares: item.stats?.shareCount || null,
+            comments: item.stats?.commentCount || null,
+            music: item.music?.title || null,
+            upload_date: item.createTime ? new Date(item.createTime * 1000).toISOString() : null,
+        });
     } catch (error) {
-        console.error(error.message);
-        res.status(500).json({ error: 'Failed to scrape TikTok video.' });
+        console.error(error);
+        res.status(500).json({ error: 'Failed to scrape TikTok.' });
     }
 });
 
