@@ -3,36 +3,33 @@ const cors = require('cors');
 const axios = require('axios');
 const cheerio = require('cheerio');
 const { getXbogus } = require('./xbogus');
-const { HttpsProxyAgent } = require('https-proxy-agent'); // IMPORTANT: Added this
 const app = express();
 
 // Middleware
 app.use(cors());
 app.use(express.json());
 
-// Load proxies (Webshare 5 private proxies)
+// Your 5 Webshare proxies
 const proxies = [
-    { host: "212.60.14.146", port: 6943, username: "ihqqebfi", password: "m65ebvc3vi3w" },
-    { host: "156.237.48.221", port: 7122, username: "ihqqebfi", password: "m65ebvc3vi3w" },
-    { host: "156.237.26.78", port: 5976, username: "ihqqebfi", password: "m65ebvc3vi3w" },
-    { host: "62.164.228.15", port: 8327, username: "ihqqebfi", password: "m65ebvc3vi3w" },
-    { host: "72.1.179.38", port: 6432, username: "ihqqebfi", password: "m65ebvc3vi3w" }
+  { host: "212.60.14.146", port: 6943, username: "ihqqebfi", password: "m65ebvc3vi3w" },
+  { host: "156.237.48.221", port: 7122, username: "ihqqebfi", password: "m65ebvc3vi3w" },
+  { host: "156.237.26.78", port: 5976, username: "ihqqebfi", password: "m65ebvc3vi3w" },
+  { host: "62.164.228.15", port: 8327, username: "ihqqebfi", password: "m65ebvc3vi3w" },
+  { host: "72.1.179.38", port: 6432, username: "ihqqebfi", password: "m65ebvc3vi3w" }
 ];
 
-// Load random user-agents
+// User-agents
 const userAgents = [
-  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15',
-  'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-  'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15A372 Safari/604.1'
+  'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15A372 Safari/604.1',
+  'Mozilla/5.0 (Linux; Android 10; SM-G973F) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Mobile Safari/537.36',
 ];
 
-// Random proxy picker
+// Random proxy
 function getRandomProxy() {
   return proxies[Math.floor(Math.random() * proxies.length)];
 }
 
-// Random user-agent picker
+// Random user-agent
 function getRandomUserAgent() {
   return userAgents[Math.floor(Math.random() * userAgents.length)];
 }
@@ -47,7 +44,7 @@ app.post('/generate-xbogus', (req, res) => {
   res.json({ xbogus });
 });
 
-// 🎯 Real Scrape Endpoint
+// 🎯 Real Scraper
 app.post('/scrape', async (req, res) => {
   const { url } = req.body;
   if (!url) {
@@ -56,8 +53,8 @@ app.post('/scrape', async (req, res) => {
 
   const maxRetries = 5;
   let attempt = 0;
-  let success = false;
   let finalError = null;
+  let success = false;
 
   while (attempt < maxRetries && !success) {
     const proxy = getRandomProxy();
@@ -65,30 +62,39 @@ app.post('/scrape', async (req, res) => {
     attempt++;
 
     try {
-      const proxyUrl = `http://${proxy.username}:${proxy.password}@${proxy.host}:${proxy.port}`;
-      const agent = new HttpsProxyAgent(proxyUrl); // <-- 🔥 HERE IS THE FIX
+      // Force mobile version
+      let mobileUrl = url.replace('www.tiktok.com', 'm.tiktok.com');
 
-      const xbogus = getXbogus(url, userAgent);
-      const fullUrl = `${url.includes('?') ? url + '&' : url + '?'}X-Bogus=${xbogus}`;
+      const xbogus = getXbogus(mobileUrl, userAgent);
+      const fullUrl = `${mobileUrl.includes('?') ? mobileUrl + '&' : mobileUrl + '?'}X-Bogus=${xbogus}`;
 
       const response = await axios.get(fullUrl, {
         headers: {
           'User-Agent': userAgent,
-          'Referer': 'https://www.tiktok.com/',
+          'Referer': 'https://m.tiktok.com/',
           'Accept-Language': 'en-US,en;q=0.9',
         },
-        httpsAgent: agent, // <-- 🔥 USE httpsAgent instead of proxy
+        proxy: {
+          host: proxy.host,
+          port: proxy.port,
+          auth: {
+            username: proxy.username,
+            password: proxy.password,
+          },
+        },
         timeout: 10000,
       });
 
       const $ = cheerio.load(response.data);
-      const jsonText = $('script[id="__NEXT_DATA__"]').html();
-      if (!jsonText) {
-        throw new Error('TikTok structure not found.');
+      const sigiScript = $('script[id="SIGI_STATE"]').html();
+
+      if (!sigiScript) {
+        throw new Error('SIGI_STATE not found.');
       }
 
-      const data = JSON.parse(jsonText);
-      const videoData = data.props.pageProps.itemInfo.itemStruct;
+      const sigiJson = JSON.parse(sigiScript);
+      const videoKey = Object.keys(sigiJson.ItemModule || {})[0];
+      const videoData = sigiJson.ItemModule?.[videoKey];
 
       if (!videoData) {
         throw new Error('Video data not found.');
@@ -96,7 +102,7 @@ app.post('/scrape', async (req, res) => {
 
       res.json({
         caption: videoData.desc || null,
-        author: videoData.author?.uniqueId || null,
+        author: videoData.author || null,
         video_url: videoData.video?.playAddr || null,
         thumbnail: videoData.video?.cover || null,
         likes: videoData.stats?.diggCount || null,
@@ -114,10 +120,10 @@ app.post('/scrape', async (req, res) => {
   }
 
   if (!success) {
-    res.status(500).json({ error: 'Failed after multiple proxy attempts: ' + finalError.message });
+    res.status(500).json({ error: 'Failed after retries: ' + finalError.message });
   }
 });
 
-// Start Server
+// Start server
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
