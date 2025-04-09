@@ -1,47 +1,49 @@
 const express = require('express');
+const cors = require('cors'); // (NEW: You need CORS)
 const app = express();
-const axios = require('axios');
-const cors = require('cors');
-const crypto = require('crypto');
+const { getXbogus } = require('./xbogus');
 
-const port = process.env.PORT || 3000;
-
-app.use(cors());
+// Middleware
+app.use(cors()); // (NEW: Allow cross-origin requests)
 app.use(express.json());
 
-// ✅ RAPIDAPI KEY CHECKER MIDDLEWARE
-app.use((req, res, next) => {
-  const apiKey = req.headers['x-rapidapi-key'];
-
-  if (!apiKey) {
-    return res.status(401).json({ message: 'Missing RapidAPI Key' });
-  }
-
-  // (Optional) You could validate apiKey format here if needed
-  next();
+// EXISTING ENDPOINT
+app.post('/generate-xbogus', (req, res) => {
+    const { url, userAgent } = req.body;
+    if (!url || !userAgent) {
+        return res.status(400).json({ error: 'Missing url or userAgent' });
+    }
+    const xbogus = getXbogus(url, userAgent);
+    res.json({ xbogus });
 });
 
-// ✅ MAIN ROUTE EXAMPLE
-app.get('/', (req, res) => {
-  res.send('TikTok Scraper API is live!');
+// 🚀 NEW SCRAPER ENDPOINT
+app.post('/scrape', async (req, res) => {
+    const { url } = req.body;
+    if (!url) {
+        return res.status(400).json({ error: 'Missing TikTok URL.' });
+    }
+
+    try {
+        // -- Placeholder Scraper Response --
+        const data = {
+            video_url: "https://example.com/video.mp4",
+            caption: "Sample TikTok Caption",
+            author: "username",
+            likes: 1000,
+            shares: 100,
+            comments: 50,
+            thumbnail: "https://example.com/thumbnail.jpg",
+            music: "Song Name",
+            upload_date: "2024-04-01"
+        };
+        res.json(data);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Failed to scrape TikTok.' });
+    }
 });
 
-// ✅ ADD YOUR OTHER ROUTES BELOW (example /fetch)
-app.get('/fetch', async (req, res) => {
-  const { url } = req.query;
-
-  if (!url) {
-    return res.status(400).json({ message: 'Missing URL' });
-  }
-
-  try {
-    const response = await axios.get(url);
-    res.json({ data: response.data });
-  } catch (error) {
-    res.status(500).json({ message: 'Error fetching URL', error: error.toString() });
-  }
-});
-
-app.listen(port, () => {
-  console.log(`Server running on port ${port}`);
-});
+// Start server
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
